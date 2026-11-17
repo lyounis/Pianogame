@@ -56,6 +56,8 @@
   .note .dt, .note .sh { fill:currentColor; }
   .note .lt { fill:currentColor; font-weight:900; font-size:26px; text-anchor:middle; font-family:-apple-system,"Avenir Next","Helvetica Neue",sans-serif; }
   .note .glow { fill:#4da3ff; opacity:0; }
+  .note .ly { fill:#6b6455; font-size:17px; text-anchor:middle; font-style:italic; font-family:-apple-system,"Avenir Next","Helvetica Neue",sans-serif; }
+  .note.now .ly { fill:#1f6fe0; font-weight:800; }
   .note.done { color:#16a04c; }
   .note.now { color:#1f6fe0; }
   .note.now .glow { opacity:.28; animation:pulse 1s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
@@ -145,16 +147,50 @@
 // "G4/h" = G above middle C, half note. Lengths: w h q e, add "." for dotted. No length = quarter note.
 const DEFAULT_SONG = "Frosty the Snowman";
 const BUILT_IN = {
-  // Frosty the Snow-man, was a jol-ly hap-py soul, with a corn-cob pipe and a but-ton nose, and two eyes made out of coal
-  "Frosty the Snowman":
-    "G4/h E4/q. F4/e  G4/q C5/h B4/e C5/e  D5/q C5/q B4/q A4/q  G4/h. A4/e B4/e " +
-    "C5/q C5/q A4/q A4/q  G4/q F4/q E4/q F4/q  G4/h G4/q F4/q  E4/q F4/q E4/q D4/q  C4/w",
+  // Transcribed from the method book arrangement (arr. Tom Gerou, pp. 30-32), verse 1 lyrics.
+  // Notes below middle C are left-hand notes on the bass staff, as in the book. "|" = bar line, R = rest.
+  "Frosty the Snowman": [
+    "C4/h:Frost- A3/q.:y, Bb3/e:the |",                         // 1
+    "C4/q:snow- F4/h:man E4/e:was F4/e:a |",                    // 2
+    "G4/q:jol- F4/q:ly E4/q:hap- D4/q:py |",                    // 3
+    "C4/h.:soul, E4/e:with F4/e:a |",                           // 4
+    "G4/q:corn- F4/q:cob E4/q:pipe D4/e:and D4/e:a |",          // 5
+    "C4/q:but- F4/q:ton A3/q:nose C4/e:and D4/e:two |",         // 6
+    "C4/q:eyes Bb3/q:made A3/q:out Bb3/q:of |",                 // 7
+    "C4/w:coal. |",                                             // 8
+    "C4/h:Frost- A3/q.:y, Bb3/e:the |",                         // 9
+    "C4/q:snow- F4/h:man E4/e:is F4/e:a |",                     // 10
+    "G4/q:fair- F4/q:y E4/q:tale, D4/q:they |",                 // 11
+    "C4/h.:say; E4/e:he F4/e:was |",                            // 12
+    "G4/q:made F4/q:of E4/q:snow, D4/e:but D4/e:the |",         // 13
+    "C4/q:chil- F4/q:dren A3/q:know C4/e:how D4/e:he |",        // 14
+    "C4/q:came Bb3/q:to A3/q:life G3/q:one |",                  // 15
+    "F3/h.:day. F3/q:There |",                                  // 16
+    "D4/q:must D4/q:have F4/q:been F4/q:some |",                // 17
+    "E4/q:mag- D4/q:ic C4/q:in A3/q:that |",                    // 18
+    "Bb3/q:old D4/q:silk C4/q:hat Bb3/q:they |",                // 19
+    "A3/h.:found, A3/e:for A3/e |",                             // 20
+    "G3/q:when G3/q:they C4/q:placed C4/q:it |",                // 21
+    "E4/q:on E4/q:his G4/q:head, G4/e:he E4/e:be- |",           // 22
+    "G4/q:gan F4/q:to E4/q:dance D4/q:a- |",                    // 23
+    "C4/q:round. R/q C4/h:Oh, |",                               // 24
+    "C4/h:Frost- A3/q.:y Bb3/e:the |",                          // 25
+    "C4/q:snow- F4/h:man E4/e:was F4/e:a- |",                   // 26
+    "G4/q:live F4/q:as E4/q:he D4/q:could |",                   // 27
+    "C4/h.:be, E4/e:and F4/e:the |",                            // 28
+    "G4/q:chil- F4/q:dren E4/q:say D4/e:he D4/e:could |",       // 29
+    "C4/q:laugh F4/q:and A3/q:play C4/e:just D4/e:the |",       // 30
+    "C4/q:same Bb3/q:as A3/q:you G3/q:and |",                   // 31
+    "F3/h.:me. R/q"                                             // 32
+  ].join(" "),
   "Ode to Joy": "E E F G G F E D C C D E E D D E E F G G F E D C C D E D C C",
   "Mary Had a Little Lamb": "E D C D E E E D D D E G G E D C D E E E E D D E D C",
   "Hot Cross Buns": "E D C E D C C C C C D D D D E D C",
   "Jingle Bells (chorus)": "E E E E E E E G C D E F F F F F E E E E D D E D G"
 };
 const NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const SHOW  = ["C","C♯","D","E♭","E","F","F♯","G","G♯","A","B♭","B"];   // kid-friendly spelling for messages and keys
+function label(n){ return n ? n.letter + (n.acc==="#"?"♯":n.acc==="b"?"♭":"") : ""; }
 const FLAT = {"DB":"C#","EB":"D#","GB":"F#","AB":"G#","BB":"A#"};
 
 function loadSongs(){
@@ -177,34 +213,45 @@ fillSongs();
 function saveSel(){ try { localStorage.setItem(SEL_KEY, sel.value); } catch(e){} }
 
 const DUR_BEATS = { w:4, h:2, q:1, e:0.5 };
-// Full parse for the sheet music: [{pc, oct, letter, sharp, dur, dot, beats}]
-function parseSongFull(str){
+const LETTER_PC = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+// Full parse for the sheet music. Token: Letter[#|b][octave][/w|h|q|e[.]][:lyric]  or  R/q (rest), "|" = bar line.
+// Returns items: notes {pc, oct, letter, acc, dur, dot, beats, lyric} and rests {rest:true, dur, dot, beats}
+function parseItems(str){
   const out=[];
-  (str||"").trim().split(/[\s,]+/).filter(Boolean).forEach(tok=>{
-    const m = tok.match(/^([A-Ga-g])([#bB]?)(\d?)(?:\/([whqeWHQE])(\.?))?$/);
+  const toks=[];
+  (str||"").trim().split(/\s+/).filter(Boolean).forEach(t=>{ if (t.indexOf(":")>=0) toks.push(t); else t.split(",").forEach(u=>u&&toks.push(u)); });
+  toks.forEach(tok=>{
+    if (tok==="|"){ out.push({bar:true}); return; }
+    const m = tok.match(/^([A-Ga-gRr])([#bB]?)(\d?)(?:\/([whqeWHQE])(\.?))?(?::(.*))?$/);
     if (!m) return;
-    let name = m[1].toUpperCase() + (m[2]==="#" ? "#" : m[2] ? "B" : "");
-    if (name.length===2 && name[1]==="B") name = FLAT[name] || name;   // flats -> sharps
-    const pc = NAMES.indexOf(name);
-    if (pc<0) return;
+    const dur=(m[4]||"q").toLowerCase(), dot=!!m[5], beats=DUR_BEATS[dur]*(dot?1.5:1);
+    const L=m[1].toUpperCase();
+    if (L==="R"){ out.push({rest:true, dur, dot, beats}); return; }
+    const acc = m[2]==="#" ? "#" : m[2] ? "b" : "";
     let oct = m[3] ? +m[3] : 4;
-    if (m[2] && m[2]!=="#" && m[1].toUpperCase()==="C") oct--;        // Cb edge case
-    const dur = (m[4]||"q").toLowerCase(), dot = !!m[5];
-    out.push({ pc, oct, letter:name[0], sharp:name.length>1, dur, dot, beats:DUR_BEATS[dur]*(dot?1.5:1) });
+    let pc = LETTER_PC[L] + (acc==="#"?1:acc==="b"?-1:0);
+    pc = (pc+12)%12;
+    out.push({ pc, oct, letter:L, acc, sharp:acc==="#", dur, dot, beats, lyric:(m[6]||"").trim() });
   });
   return out;
 }
+function parseSongFull(str){ return parseItems(str).filter(n=>!n.rest && !n.bar); }
 function parseSong(str){ return parseSongFull(str).map(n=>n.pc); }
 
 // ---------- Game state ----------
 let seq=[], idx=0, score=0, right=0, wrong=0, lastHitTime=0, gaps=[];
 const $ = id=>document.getElementById(id);
 
-let song=[];
-let songPos=[];   // beat position where each note starts (quarter = 1 beat)
+let song=[], items=[];
+let songPos=[];   // beat position where each note starts (quarter = 1 beat); rests take up time too
 function loadSel(){
-  song = parseSongFull(SONGS[sel.value]); seq = song.map(n=>n.pc);
-  let b=0; songPos = song.map(n=>{ const p=b; b+=n.beats; return p; });
+  items = parseItems(SONGS[sel.value]).filter(n=>!n.bar);
+  song = items.filter(n=>!n.rest); seq = song.map(n=>n.pc);
+  let b=0; songPos=[];
+  items.forEach(n=>{ n.pos=b; if (!n.rest) songPos.push(b); b+=n.beats; });
+  const seen={};   // accidentals carry through the bar, so only print the first one
+  items.forEach(n=>{ if (n.rest) return; const bar=Math.floor(n.pos/4+1e-6), k=bar+":"+n.letter+n.oct;
+    n.showAcc = !!n.acc && seen[k]!==n.acc; seen[k]=n.acc||""; });
   if (typeof updateTempoUI==="function") updateTempoUI();
 }
 function newGame(fromTap){
@@ -217,7 +264,7 @@ function newGame(fromTap){
 }
 // ---------- Sheet music (SVG treble staff) ----------
 const SVGNS="http://www.w3.org/2000/svg";
-const SP=22, TOP=62, BOTTOM=TOP+4*SP, LETTER_Y=232, CLEF_W=78;
+let SP=22, TOP=62, BOTTOM=TOP+4*SP, LETTER_Y=232, LYRIC_Y=0, BTOP=0, BBOT=0, SVG_H=250, CLEF_W=78, GRAND=false;
 const STEP = {C:0,D:1,E:2,F:3,G:4,A:5,B:6};
 let noteX=[], noteEls=[];
 function el(tag, attrs, parent){
@@ -226,58 +273,109 @@ function el(tag, attrs, parent){
   if (parent) parent.appendChild(e);
   return e;
 }
-function stepOf(n){ return n.oct*7 + STEP[n.letter]; }            // E4 (bottom line) = 30
-function yOf(step){ return BOTTOM - (step-30)*SP/2; }
-function staffLines(svg, w){ for (let i=0;i<5;i++) el("line",{x1:0,x2:w,y1:TOP+i*SP,y2:TOP+i*SP,stroke:"#3b3b46","stroke-width":2},svg); }
+function stepOf(n){ return n.oct*7 + STEP[n.letter]; }            // E4 (treble bottom line) = 30, G2 (bass bottom line) = 18
+function onBass(n){ return GRAND && stepOf(n) < 28; }               // below middle C -> left hand / bass staff
+function yOf(step, bass){ return bass ? BBOT - (step-18)*SP/2 : BOTTOM - (step-30)*SP/2; }
+function layout(){
+  // grand staff when the song has notes below middle C (like the book), otherwise the single treble staff
+  GRAND = song.some(n=>stepOf(n)<28);
+  const hasLyrics = song.some(n=>n.lyric);
+  if (GRAND){
+    SP=19; TOP=52; BOTTOM=TOP+4*SP; LETTER_Y=BOTTOM+62; LYRIC_Y=LETTER_Y+28;
+    BTOP=(hasLyrics?LYRIC_Y:LETTER_Y)+34; BBOT=BTOP+4*SP; SVG_H=BBOT+36;
+  } else {
+    SP=22; TOP=62; BOTTOM=TOP+4*SP; LETTER_Y=232; LYRIC_Y=hasLyrics?262:0; BTOP=BBOT=0; SVG_H=hasLyrics?280:250;
+  }
+  CLEF_W = 112;
+  ["staff","clefBox"].forEach(id=>$(id).setAttribute("height",SVG_H));
+}
+function staffLines(svg, w){
+  for (let i=0;i<5;i++) el("line",{x1:0,x2:w,y1:TOP+i*SP,y2:TOP+i*SP,stroke:"#3b3b46","stroke-width":2},svg);
+  if (GRAND) for (let i=0;i<5;i++) el("line",{x1:0,x2:w,y1:BTOP+i*SP,y2:BTOP+i*SP,stroke:"#3b3b46","stroke-width":2},svg);
+}
+function timeSig(svg, x, top){
+  [top+2*SP-3, top+4*SP-3].forEach(y=>{ const t=el("text",{x:x,y:y,"font-size":SP*2.3,"font-weight":900,"text-anchor":"middle",fill:"#23232c","font-family":"Georgia,serif"},svg); t.textContent="4"; });
+}
 function drawClef(){
-  const svg=$("clefBox"); svg.innerHTML="";
+  const svg=$("clefBox"); svg.innerHTML=""; svg.setAttribute("width",CLEF_W);
   staffLines(svg, CLEF_W);
   // treble (G) clef drawn as a path so it looks the same on every device; the curl wraps the G line
-  const g=el("g",{transform:"translate(14,"+(TOP-1.6*SP)+") scale("+SP+")"},svg);
+  const g=el("g",{transform:"translate(10,"+(TOP-1.6*SP)+") scale("+SP+")"},svg);
   el("path",{d:"M1.05 6.55 C0.45 6.75 0.15 6.05 0.6 5.8 C1.05 5.6 1.4 6.1 1.2 6.45 C1.05 6.8 1.55 6.5 1.55 5.9 L1.42 0.9 C1.4 0.2 1.8 -0.2 2.05 0.1 C2.35 0.5 2.05 1.3 1.5 1.9 C0.85 2.6 0.35 3.2 0.35 4.1 C0.35 5.1 1.2 5.45 1.85 5.3 C2.5 5.15 2.75 4.4 2.4 3.95 C2.05 3.5 1.3 3.55 1.15 4.05 C1.05 4.4 1.3 4.65 1.55 4.65",
      fill:"none",stroke:"#23232c","stroke-width":0.2,"stroke-linecap":"round","stroke-linejoin":"round"},g);
   el("circle",{cx:1.05,cy:6.25,r:0.32,fill:"#23232c"},g);
+  timeSig(svg, 82, TOP);                                      // 4/4 time
+  if (GRAND){
+    // bass (F) clef: a curl starting on the F line plus two dots around it
+    const b=el("g",{transform:"translate(12,"+BTOP+") scale("+SP+")"},svg);
+    el("path",{d:"M0.55 1.05 C0.55 0.35 1.15 0.05 1.6 0.1 C2.3 0.15 2.6 0.75 2.5 1.35 C2.35 2.3 1.4 3.1 0.3 3.55",fill:"none",stroke:"#23232c","stroke-width":0.24,"stroke-linecap":"round"},b);
+    el("circle",{cx:0.65,cy:1.0,r:0.32,fill:"#23232c"},b);
+    el("circle",{cx:2.95,cy:0.55,r:0.17,fill:"#23232c"},b);
+    el("circle",{cx:2.95,cy:1.45,r:0.17,fill:"#23232c"},b);
+    timeSig(svg, 82, BTOP);
+    el("line",{x1:2,x2:2,y1:TOP,y2:BBOT,stroke:"#3b3b46","stroke-width":3},svg);   // brace line
+  }
 }
 function renderNotes(){
+  layout(); drawClef();
   const svg=$("staff"); svg.innerHTML=""; noteX=[]; noteEls=[];
   $("sheetTitle").textContent = sel.value;
-  let x=CLEF_W+40, beats=0;
-  const bars=[];
-  song.forEach((n,i)=>{
-    const w = 64 + Math.min(4,n.beats)*14;
-    noteX.push(x); x += w;
-    beats += n.beats;
-    if (i<song.length-1 && Math.abs(beats/4 - Math.round(beats/4))<1e-6) bars.push(x - w/2 + 6);
+  let x=CLEF_W+34, beats=0;
+  const bars=[], restAt=[];
+  items.forEach((n,i)=>{
+    const w = (GRAND?58:64) + Math.min(4,n.beats)*(GRAND?12:14) + (n.lyric && n.lyric.length>5 ? 10 : 0);
+    if (n.rest) restAt.push([n,x]); else noteX.push(x);
+    x += w; beats += n.beats;
+    if (i<items.length-1 && Math.abs(beats/4 - Math.round(beats/4))<1e-6) bars.push(x - w/2 + 6);
   });
   const W = Math.max(x+40, $("sheetScroll").clientWidth || 600);
   svg.setAttribute("width", W);
   staffLines(svg, W);
-  bars.forEach(bx=>el("line",{x1:bx,x2:bx,y1:TOP,y2:BOTTOM,stroke:"#3b3b46","stroke-width":2},svg));
-  // final double bar
-  el("line",{x1:x-14,x2:x-14,y1:TOP,y2:BOTTOM,stroke:"#3b3b46","stroke-width":2},svg);
-  el("line",{x1:x-6,x2:x-6,y1:TOP,y2:BOTTOM,stroke:"#3b3b46","stroke-width":6},svg);
+  const y2 = GRAND ? BBOT : BOTTOM;
+  const bar=(bx,wd)=>{ el("line",{x1:bx,x2:bx,y1:TOP,y2:BOTTOM,stroke:"#3b3b46","stroke-width":wd},svg); if (GRAND) el("line",{x1:bx,x2:bx,y1:BTOP,y2:BBOT,stroke:"#3b3b46","stroke-width":wd},svg); };
+  bars.forEach(bx=>bar(bx,2));
+  bar(x-14,2); bar(x-6,6);                                  // final double bar
+  restAt.forEach(([n,rx])=>drawRest(svg,n,rx));
   song.forEach((n,i)=>{ noteEls.push(drawNote(svg, n, noteX[i], "note")); });
   el("ellipse",{id:"ballShadow",cx:-50,cy:TOP-4,rx:10,ry:3},svg);
   el("circle",{id:"ball",cx:-50,cy:TOP-14,r:11},svg);
 }
+function drawRest(svg, n, x){
+  // rests sit on the treble staff (the melody rests in both hands)
+  const g=el("g",{class:"rest"},svg), c="#8a8f9e";
+  if (n.dur==="w") el("rect",{x:x-10,y:TOP+SP,width:20,height:SP*0.5,fill:c},g);
+  else if (n.dur==="h") el("rect",{x:x-10,y:TOP+2*SP-SP*0.5,width:20,height:SP*0.5,fill:c},g);
+  else if (n.dur==="e"){ el("circle",{cx:x-4,cy:TOP+1.6*SP,r:4,fill:c},g); el("path",{d:"M"+(x-4)+" "+(TOP+1.6*SP)+" q8 4 12 -4 l-9 "+(SP*2.2),stroke:c,"stroke-width":3,fill:"none"},g); }
+  else el("path",{d:"M"+(x-4)+" "+(TOP+0.6*SP)+" l9 "+(SP*0.9)+" l-8 "+(SP*0.8)+" l9 "+(SP*0.8)+" q-12 -4 -6 "+(SP*1.0),stroke:c,"stroke-width":4,fill:"none","stroke-linejoin":"round"},g);
+  if (n.dot) el("circle",{cx:x+14,cy:TOP+1.5*SP,r:3.2,fill:c},g);
+  const t=el("text",{x:x,y:LETTER_Y,"text-anchor":"middle","font-size":16,fill:"#8a8f9e","font-weight":700},g); t.textContent="rest";
+  return g;
+}
 function drawNote(svg, n, x, cls){
   const g=el("g",{class:cls},svg);
-  const s=stepOf(n), y=yOf(s);
-  el("circle",{class:"glow",cx:x,cy:(Math.min(y,BOTTOM)+Math.max(y,TOP))/2,r:34},g);
+  const bass=onBass(n), s=stepOf(n), y=yOf(s,bass);
+  const sTop = bass?BTOP:TOP, sBot = bass?BBOT:BOTTOM;
+  el("circle",{class:"glow",cx:x,cy:(Math.min(y,sBot)+Math.max(y,sTop))/2,r:34},g);
   const art=el("g",{class:"art"},g);
   // ledger lines (middle C and anything off the staff)
-  for (let st=28; st>=s; st-=2) el("line",{class:"lg",x1:x-20,x2:x+20,y1:yOf(st),y2:yOf(st)},art);
-  for (let st=40; st<=s; st+=2) el("line",{class:"lg",x1:x-20,x2:x+20,y1:yOf(st),y2:yOf(st)},art);
-  if (n.sharp){ const t=el("text",{class:"sh",x:x-36,y:y+9,"font-size":28,"font-weight":700},art); t.textContent="♯"; }
+  if (bass){
+    for (let st=28; st<=s; st+=2) el("line",{class:"lg",x1:x-20,x2:x+20,y1:yOf(st,1),y2:yOf(st,1)},art);
+    for (let st=16; st>=s; st-=2) el("line",{class:"lg",x1:x-20,x2:x+20,y1:yOf(st,1),y2:yOf(st,1)},art);
+  } else {
+    for (let st=28; st>=s; st-=2) el("line",{class:"lg",x1:x-20,x2:x+20,y1:yOf(st),y2:yOf(st)},art);
+    for (let st=40; st<=s; st+=2) el("line",{class:"lg",x1:x-20,x2:x+20,y1:yOf(st),y2:yOf(st)},art);
+  }
+  if (n.acc && n.showAcc!==false){ const t=el("text",{class:"sh",x:x-34,y:y+(n.acc==="b"?6:9),"font-size":28,"font-weight":700},art); t.textContent = n.acc==="#"?"♯":"♭"; }
   el("ellipse",{class:"hd"+(n.dur==="w"||n.dur==="h"?" hollow":""),cx:x,cy:y,rx:12.5,ry:9,transform:"rotate(-20 "+x+" "+y+")"},art);
   if (n.dot) el("circle",{class:"dt",cx:x+20,cy:(s%2===0)?y-SP/2:y,r:3.6},art);
   if (n.dur!=="w"){
-    const up = s < 34;                       // below the middle line: stem up on the right
+    const up = bass ? s < 22 : s < 34;      // below the middle line: stem up on the right
     const sx = up ? x+11.5 : x-11.5, sy2 = up ? y-3.4*SP : y+3.4*SP;
     el("line",{class:"st",x1:sx,x2:sx,y1:y,y2:sy2},art);
     if (n.dur==="e") el("path",{class:"fl",d: up ? "M"+sx+" "+sy2+" q16 14 12 34" : "M"+sx+" "+sy2+" q16 -14 12 -34"},art);
   }
-  const lt=el("text",{class:"lt",x:x,y:LETTER_Y},g); lt.textContent = n.letter + (n.sharp?"♯":"");
+  const lt=el("text",{class:"lt",x:x,y:LETTER_Y},g); lt.textContent = label(n);
+  if (n.lyric && LYRIC_Y){ const ly=el("text",{class:"ly",x:x,y:LYRIC_Y},g); ly.textContent=n.lyric; }
   return g;
 }
 function scrollToNote(i){
@@ -287,9 +385,9 @@ function scrollToNote(i){
 function ghostNote(pc){
   // show the wrong note in red for a moment at the current spot
   if (!song[idx]) return;
-  const exp=song[idx], name=NAMES[pc];
+  const exp=song[idx], name=SHOW[pc];
   let best=null;
-  [exp.oct-1,exp.oct,exp.oct+1].forEach(o=>{ const c={pc,oct:o,letter:name[0],sharp:name.length>1,dur:"q",dot:false,beats:1};
+  [exp.oct-1,exp.oct,exp.oct+1].forEach(o=>{ const c={pc,oct:o,letter:name[0],acc:name[1]==="♯"?"#":name[1]==="♭"?"b":"",dur:"q",dot:false,beats:1};
     if (!best || Math.abs(stepOf(c)-stepOf(exp))<Math.abs(stepOf(best)-stepOf(exp))) best=c; });
   const g=drawNote($("staff"), best, noteX[idx]+30, "note ghost");
   g.querySelector(".lt").setAttribute("y", LETTER_Y-0);
@@ -303,7 +401,7 @@ function update(){
     g.setAttribute("class","note"+(i<idx?" done":"")+(i===idx?" now":"")+(keepPop?" pop":""));
   });
   scrollToNote(idx);
-  $("target").textContent = idx<seq.length ? NAMES[seq[idx]] : "🎉";
+  $("target").textContent = idx<seq.length ? label(song[idx]) : "🎉";
   $("prog").style.width = (seq.length? idx/seq.length*100 : 0)+"%";
   $("score").textContent=score; $("right").textContent=right; $("wrong").textContent=wrong;
   $("stars").textContent = "⭐".repeat(Math.floor(right/5));
@@ -335,7 +433,7 @@ function hit(){
 }
 function miss(n){
   wrong++; score=Math.max(0,score-2);
-  $("heard").textContent = "I heard " + NAMES[n] + " — try " + NAMES[seq[idx]] + "!";
+  $("heard").textContent = "I heard " + SHOW[n] + " — try " + label(song[idx]) + "!";
   flash("#ff5c6c"); update(); ghostNote(n);
 }
 // Shared input path: mic, on-screen keys, and the debug hook all land here
@@ -354,7 +452,7 @@ function finish(){
 
 // ---------- Tempo helper (beat ball, metronome, timing feedback) ----------
 const TEMPO_KEY="pianoStarTempo";
-const DEFAULT_BPM={"Frosty the Snowman":84,"Ode to Joy":96,"Mary Had a Little Lamb":100,"Hot Cross Buns":92,"Jingle Bells (chorus)":108};
+const DEFAULT_BPM={"Frosty the Snowman":92,"Ode to Joy":96,"Mary Had a Little Lamb":100,"Hot Cross Buns":92,"Jingle Bells (chorus)":108};
 let tset={on:true, tick:true, bpm:{}};
 try { Object.assign(tset, JSON.parse(localStorage.getItem(TEMPO_KEY)||"{}")); } catch(e){}
 function saveT(){ try { localStorage.setItem(TEMPO_KEY, JSON.stringify(tset)); } catch(e){} }
@@ -417,7 +515,7 @@ function tempoLoop(){
     const p=posNow(now);
     if (p > songPos[idx]+2){
       T.phase="waiting";                         // far behind: stop the clock and wait, no penalty
-      $("heard").textContent="Take your time — play " + NAMES[seq[idx]] + " 🙂";
+      $("heard").textContent="Take your time — play " + label(song[idx]) + " 🙂";
     } else {
       // metronome: tick on whole beats (beat 1 of each bar accented), scheduled ~40 ms ahead
       let k = isFinite(T.lastTickPos) ? T.lastTickPos+1 : Math.ceil(p-0.02);
@@ -568,7 +666,7 @@ sel.onchange = ()=>{ saveSel(); if (running || tapMode) newGame(); else { loadSe
 let tapMode=false;
 (function buildKeys(){
   const k=$("keys");
-  NAMES.forEach((nm,i)=>{ const b=document.createElement("button"); b.textContent=nm.replace("#","♯"); if (nm.length>1) b.className="blk";
+  NAMES.forEach((nm,i)=>{ const b=document.createElement("button"); b.textContent=SHOW[i]; if (nm.length>1) b.className="blk";
     b.onclick=()=>{ ensureCtx(); if (!running && !tapMode){ tapMode=true; $("prompt").textContent="Tap the note:"; newGame(true); } handleNote(i); };
     k.appendChild(b); });
 })();
@@ -587,7 +685,7 @@ $("saveSong").onclick = ()=>{
   sel.onchange();
 };
 // preview the default song before starting
-drawClef(); loadSel(); renderNotes(); update(); updateTempoUI(); $("target").textContent="♪"; tempoLoop();
+loadSel(); renderNotes(); update(); updateTempoUI(); $("target").textContent="♪"; tempoLoop();
 </script>
 </body>
 </html>
