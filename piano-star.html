@@ -69,6 +69,24 @@
   #keys { display:none; justify-content:center; gap:4px; margin:10px 0 0; }
   #keys button { width:62px; height:110px; padding:0; font-size:22px; border-radius:0 0 10px 10px; background:#fff; color:#1e2a5a; box-shadow:0 4px 0 #aab; display:flex; align-items:flex-end; justify-content:center; padding-bottom:10px; }
   #keys button.blk { background:#222; color:#fff; width:44px; height:80px; font-size:15px; box-shadow:0 4px 0 #000; }
+  /* tempo helper */
+  #tempoRow button { font-size:20px; padding:10px 16px; }
+  #tempoRow button.tog.off { opacity:.55; }
+  #bpm { width:180px; height:34px; accent-color:#ffd23f; }
+  #bpmVal { font-size:22px; font-weight:800; min-width:96px; }
+  #beatFb { position:absolute; left:50%; top:-10px; background:var(--card); padding:0 18px; border-radius:16px; transform:translateX(-50%) scale(.8); font-size:40px; font-weight:900; z-index:4;
+            opacity:0; transition:opacity .2s, transform .2s; pointer-events:none; white-space:nowrap; text-shadow:0 3px 0 rgba(0,0,0,.35); }
+  #beatFb.show { opacity:1; transform:translateX(-50%) scale(1); }
+  #gauge { position:relative; height:36px; margin:4px auto 6px; width:min(92%,560px); border-radius:18px; display:flex; justify-content:space-between; align-items:center;
+           padding:0 14px; font-size:18px; font-weight:800;
+           background:linear-gradient(90deg,#f08a00aa,#16a04caa 38%,#16a04caa 62%,#1f6fe0aa); }
+  #needle { position:absolute; top:-5px; left:50%; width:8px; height:46px; margin-left:-4px; background:#fff; border-radius:4px;
+            box-shadow:0 0 0 2px #1e2a5a; transition:left .45s ease-out; }
+  #ball { fill:#ffd23f; stroke:#b8901a; stroke-width:3; }
+  #ball.waiting { animation:pulse 1s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
+  #ballShadow { fill:rgba(0,0,0,.15); }
+  .note.go { color:#e08a00; }
+  .note.go .glow { fill:#ffd23f; opacity:.55; }
   #addSong { display:none; width:min(96vw,1000px); background:var(--card); border-radius:20px; padding:16px; margin-top:12px; }
   #addSong textarea { width:100%; height:70px; font-size:20px; border-radius:10px; padding:8px; }
 </style>
@@ -83,15 +101,25 @@
   <button id="keysBtn" class="secondary">🎹 Tap keys</button>
 </div>
 
+<div class="row" id="tempoRow">
+  <button id="helperBtn" class="secondary tog">🥁 Beat helper: On</button>
+  <button id="slower" class="secondary">−</button>
+  <input type="range" id="bpm" min="50" max="140" step="2">
+  <button id="faster" class="secondary">＋</button>
+  <span id="bpmVal">84 BPM</span>
+  <button id="tickBtn" class="secondary tog">🔔 Tick: On</button>
+</div>
+
 <div id="stage">
   <div id="prompt">Tap Start and allow the microphone 🎤</div>
   <div id="target">♪</div>
-  <div id="heard">&nbsp;</div>
+  <div style="position:relative"><div id="heard">&nbsp;</div><div id="beatFb"></div></div>
   <div id="sheet">
     <div id="sheetTitle"></div>
     <svg id="clefBox" width="78" height="250"></svg>
     <div id="sheetScroll"><svg id="staff" height="250"></svg></div>
   </div>
+  <div id="gauge"><span>🐢 Slow down</span><span>🎯</span><span>Speed up 🐇</span><div id="needle"></div></div>
   <div id="keys"></div>
   <div class="bar"><div id="prog"></div></div>
   <div id="stats"><div>⭐ <span id="score">0</span></div><div>✅ <span id="right">0</span></div><div>❌ <span id="wrong">0</span></div></div>
@@ -173,13 +201,19 @@ let seq=[], idx=0, score=0, right=0, wrong=0, lastHitTime=0, gaps=[];
 const $ = id=>document.getElementById(id);
 
 let song=[];
-function loadSel(){ song = parseSongFull(SONGS[sel.value]); seq = song.map(n=>n.pc); }
-function newGame(){
+let songPos=[];   // beat position where each note starts (quarter = 1 beat)
+function loadSel(){
+  song = parseSongFull(SONGS[sel.value]); seq = song.map(n=>n.pc);
+  let b=0; songPos = song.map(n=>{ const p=b; b+=n.beats; return p; });
+  if (typeof updateTempoUI==="function") updateTempoUI();
+}
+function newGame(fromTap){
   loadSel();
   idx=0; score=0; right=0; wrong=0; lastHitTime=0; gaps=[];
   armed = true; wrongRun = 0;
   $("big").style.display="none";
   renderNotes(); update();
+  tempoReset(fromTap===true);
 }
 // ---------- Sheet music (SVG treble staff) ----------
 const SVGNS="http://www.w3.org/2000/svg";
@@ -223,6 +257,8 @@ function renderNotes(){
   el("line",{x1:x-14,x2:x-14,y1:TOP,y2:BOTTOM,stroke:"#3b3b46","stroke-width":2},svg);
   el("line",{x1:x-6,x2:x-6,y1:TOP,y2:BOTTOM,stroke:"#3b3b46","stroke-width":6},svg);
   song.forEach((n,i)=>{ noteEls.push(drawNote(svg, n, noteX[i], "note")); });
+  el("ellipse",{id:"ballShadow",cx:-50,cy:TOP-4,rx:10,ry:3},svg);
+  el("circle",{id:"ball",cx:-50,cy:TOP-14,r:11},svg);
 }
 function drawNote(svg, n, x, cls){
   const g=el("g",{class:cls},svg);
@@ -278,12 +314,15 @@ function flash(color){
 function hit(){
   const now=performance.now();
   let pts=10, msg="Yes! 🎉";
-  if (lastHitTime){
+  const j = judgeTiming(now);          // tempo helper: compare with when the note was due
+  if (tset.on && j){ if (j.kind==="ok"){ pts+=5; msg="On the beat! +5 🥁"; } }
+  if (lastHitTime && !tset.on){
     const gap=(now-lastHitTime)/1000; gaps.push(gap);
     // steady-rhythm bonus: gap close to his own average pace
     const avg=gaps.reduce((a,b)=>a+b,0)/gaps.length;
     if (gaps.length>2 && Math.abs(gap-avg) < avg*0.35){ pts+=5; msg="Great rhythm! +5 🥁"; }
   }
+  if (lastHitTime && tset.on){ gaps.push((now-lastHitTime)/1000); }
   lastHitTime=now;
   score+=pts; right++;
   const g=noteEls[idx]; if (g){ g.classList.add("pop"); setTimeout(()=>g.classList.remove("pop"),360); }
@@ -305,12 +344,139 @@ function handleNote(n){
   if (n===seq[idx]) hit(); else miss(n);
 }
 function finish(){
+  T.phase="done";
   const acc = right/Math.max(1,right+wrong);
   const s = acc>0.9?3:acc>0.7?2:1;
   $("bigText").innerHTML = (s===3?"Amazing!":s===2?"Great job!":"Nice work!") + "<br><span style='font-size:36px'>Score " + score + "</span>";
   $("bigStars").textContent = "⭐".repeat(s) + "☆".repeat(3-s);
   $("big").style.display="flex";
 }
+
+// ---------- Tempo helper (beat ball, metronome, timing feedback) ----------
+const TEMPO_KEY="pianoStarTempo";
+const DEFAULT_BPM={"Frosty the Snowman":84,"Ode to Joy":96,"Mary Had a Little Lamb":100,"Hot Cross Buns":92,"Jingle Bells (chorus)":108};
+let tset={on:true, tick:true, bpm:{}};
+try { Object.assign(tset, JSON.parse(localStorage.getItem(TEMPO_KEY)||"{}")); } catch(e){}
+function saveT(){ try { localStorage.setItem(TEMPO_KEY, JSON.stringify(tset)); } catch(e){} }
+function bpm(){ return tset.bpm[sel.value] || DEFAULT_BPM[sel.value] || 90; }
+function beatMs(){ return 60000/bpm(); }
+// phase: idle (no clock) | first (clock starts on first correct note) | playing | waiting (far behind, ball waits) | done
+let T={phase:"idle", anchorTime:0, anchorPos:0, lastTickPos:-Infinity, lastTickAt:-1, errs:[], log:[], countShown:false};
+function posNow(t){ return T.anchorPos + (t-T.anchorTime)/beatMs(); }
+function anchor(t,i){ T.anchorTime=t; T.anchorPos=songPos[i]||0; }
+function tempoReset(fromTap){
+  T.errs=[]; T.log=[]; T.lastTickPos=-Infinity; setNeedle(0);
+  if (!tset.on || !(running||tapMode)){ T.phase="idle"; return; }
+  if (fromTap){ T.phase="first"; return; }       // first tap starts the beat
+  T.phase="playing"; T.anchorTime=performance.now()+400; T.anchorPos=-4;   // gentle 4-beat count-in
+}
+function judgeTiming(now){
+  if (!tset.on || T.phase==="idle" || T.phase==="done") return null;
+  if (T.phase==="first"){ anchor(now, idx); T.phase="playing"; return null; }
+  const due = T.anchorTime + (songPos[idx]-T.anchorPos)*beatMs();
+  const err = (now-due)/beatMs();               // in beats; + = late, - = early
+  let kind = (T.phase==="waiting" || err>2) ? "wait" : err<-0.25 ? "early" : err>0.25 ? "late" : "ok";
+  anchor(now, idx); T.phase="playing";          // the beat continues from where he played (no pile-up)
+  if (kind!=="wait"){
+    T.errs.push(Math.max(-1,Math.min(1,err))); if (T.errs.length>5) T.errs.shift();
+    setNeedle(T.errs.reduce((a,b)=>a+b,0)/T.errs.length);
+  }
+  showFb(kind); T.log.push({note:idx, err:+err.toFixed(2), kind});
+  return {err, kind};
+}
+const FB={ ok:["On the beat! 🎯","#3ddc84"], early:["Slow down 🐢","#ffa94d"], late:["Speed up 🐇","#8fd3ff"], wait:["There you go! 👍","#d6ceff"] };
+let fbTimer;
+function showFb(kind){
+  const f=$("beatFb"); f.textContent=FB[kind][0]; f.style.color=FB[kind][1];
+  f.classList.add("show"); clearTimeout(fbTimer); fbTimer=setTimeout(()=>f.classList.remove("show"),900);
+}
+function setNeedle(avg){ $("needle").style.left = (50 + Math.max(-1,Math.min(1,avg))*44) + "%"; }
+
+let noiseBuf=null;
+function playTick(accent, delayMs){
+  if (!ctx || !tset.tick) return;
+  if (!noiseBuf){ noiseBuf=ctx.createBuffer(1, Math.floor(ctx.sampleRate*0.04), ctx.sampleRate);
+    const d=noiseBuf.getChannelData(0); for (let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,3); }
+  const t=ctx.currentTime + Math.max(0,delayMs)/1000;
+  const src=ctx.createBufferSource(); src.buffer=noiseBuf;
+  const bp=ctx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=accent?2600:1800; bp.Q.value=4;
+  const g=ctx.createGain();
+  const peak = running ? (accent?0.22:0.12) : (accent?0.8:0.45);   // quieter + shorter when the mic is listening
+  const len = running ? 0.025 : 0.04;
+  g.gain.setValueAtTime(peak,t); g.gain.exponentialRampToValueAtTime(0.0008,t+len);
+  src.connect(bp); bp.connect(g); g.connect(ctx.destination); src.start(t); src.stop(t+len+0.01);
+}
+function ensureCtx(){
+  try { ctx = ctx || new (window.AudioContext||window.webkitAudioContext)(); ctx.resume(); } catch(e){}
+}
+function tickGate(now){ return T.lastTickAt>0 && now>=T.lastTickAt-15 && now<T.lastTickAt+85; }
+
+function tempoLoop(){
+  const now=performance.now();
+  if (T.phase==="playing" && idx<seq.length){
+    const p=posNow(now);
+    if (p > songPos[idx]+2){
+      T.phase="waiting";                         // far behind: stop the clock and wait, no penalty
+      $("heard").textContent="Take your time — play " + NAMES[seq[idx]] + " 🙂";
+    } else {
+      // metronome: tick on whole beats (beat 1 of each bar accented), scheduled ~40 ms ahead
+      let k = isFinite(T.lastTickPos) ? T.lastTickPos+1 : Math.ceil(p-0.02);
+      k = Math.max(k, Math.ceil(p-0.02));
+      const tAt = T.anchorTime + (k-T.anchorPos)*beatMs();
+      if (tAt-now < 40 && k <= songPos[idx]+2){
+        playTick(((k%4)+4)%4===0, tAt-now); T.lastTickPos=k; T.lastTickAt=tAt;
+      }
+      // count-in numbers
+      if (p<0){ $("target").textContent = String(Math.ceil(-p-1e-6)); T.countShown=true; }
+      else if (T.countShown){ T.countShown=false; update(); }
+    }
+  }
+  drawBall(now);
+  requestAnimationFrame(tempoLoop);
+}
+function drawBall(now){
+  const ball=$("ball"), sh=$("ballShadow"); if (!ball) return;
+  const cur=noteEls[idx];
+  if (!tset.on || idx>=seq.length || !noteX.length || T.phase==="done"){
+    ball.style.display=sh.style.display="none"; if (cur) cur.classList.remove("go"); return;
+  }
+  ball.style.display=sh.style.display="";
+  let x=noteX[idx], hop=0, go=false;
+  if (T.phase==="playing"){
+    const p=posNow(now), target=songPos[idx];
+    if (p>=target){ go=true; hop=Math.abs(Math.sin(Math.PI*(p-target)))*0.25; }
+    else {
+      const startPos = idx>0 ? songPos[idx-1] : -4, startX = idx>0 ? noteX[idx-1] : noteX[0]-90;
+      const L=Math.max(0.01,target-startPos), frac=Math.max(0,Math.min(1,(p-startPos)/L));
+      x = startX + (noteX[idx]-startX)*frac;
+      hop = Math.abs(Math.sin(Math.PI*Math.max(1,Math.round(L))*frac));   // one hop per beat, lands on the note when it's due
+    }
+  }
+  ball.classList.toggle("waiting", T.phase==="waiting");
+  ball.setAttribute("cx",x); ball.setAttribute("cy",TOP-14-hop*32);
+  sh.setAttribute("cx",x); sh.setAttribute("rx",10-hop*5);
+  if (cur) cur.classList.toggle("go", go);
+}
+function updateTempoUI(){
+  $("bpm").value=bpm(); $("bpmVal").textContent=bpm()+" BPM";
+  $("helperBtn").textContent="🥁 Beat helper: "+(tset.on?"On":"Off"); $("helperBtn").classList.toggle("off",!tset.on);
+  $("tickBtn").textContent="🔔 Tick: "+(tset.tick?"On":"Off"); $("tickBtn").classList.toggle("off",!tset.tick);
+  ["slower","faster","bpm","tickBtn"].forEach(id=>$(id).disabled=!tset.on);
+  $("gauge").style.display = tset.on ? "flex" : "none";
+}
+function setBpm(v){
+  v=Math.max(50,Math.min(140,Math.round(v)));
+  const now=performance.now();
+  if (T.phase==="playing"){ const p=posNow(now); tset.bpm[sel.value]=v; T.anchorTime=now; T.anchorPos=p; }  // no jump
+  else tset.bpm[sel.value]=v;
+  saveT(); updateTempoUI();
+}
+$("slower").onclick=()=>setBpm(bpm()-4);
+$("faster").onclick=()=>setBpm(bpm()+4);
+$("bpm").oninput=e=>setBpm(+e.target.value);
+$("helperBtn").onclick=()=>{ tset.on=!tset.on; saveT(); updateTempoUI();
+  if (!tset.on) T.phase="idle"; else if ((running||tapMode) && idx<seq.length) T.phase="first"; };
+$("tickBtn").onclick=()=>{ ensureCtx(); tset.tick=!tset.tick; saveT(); updateTempoUI(); };
 
 // ---------- Microphone + pitch detection ----------
 let ctx, analyser, buf, running=false;
@@ -375,6 +541,8 @@ function loop(){
   analyser.getFloatTimeDomainData(buf);
   const {f,rms} = detectPitch(buf, ctx.sampleRate);
   $("lvl").style.width = Math.min(100, rms*600)+"%";
+  // ignore ~80 ms around each metronome tick so the click is never heard as a note
+  if (tickGate(performance.now())){ stableNote=-1; stableCount=0; requestAnimationFrame(loop); return; }
 
   // re-arm after the sound fades (lets repeated notes like C C count twice)
   if (rms > peakRms) peakRms = rms;
@@ -394,20 +562,21 @@ function loop(){
 // ---------- Buttons ----------
 $("start").onclick = startMic;
 $("restart").onclick = ()=>{ if (running || tapMode) newGame(); };
-$("again").onclick = newGame;
+$("again").onclick = ()=>newGame();
 sel.onchange = ()=>{ saveSel(); if (running || tapMode) newGame(); else { loadSel(); idx=0; renderNotes(); update(); } };
 // On-screen keys (tap input, handy without a piano or for testing)
 let tapMode=false;
 (function buildKeys(){
   const k=$("keys");
   NAMES.forEach((nm,i)=>{ const b=document.createElement("button"); b.textContent=nm.replace("#","♯"); if (nm.length>1) b.className="blk";
-    b.onclick=()=>{ if (!running && !tapMode){ tapMode=true; $("prompt").textContent="Tap the note:"; newGame(); } handleNote(i); };
+    b.onclick=()=>{ ensureCtx(); if (!running && !tapMode){ tapMode=true; $("prompt").textContent="Tap the note:"; newGame(true); } handleNote(i); };
     k.appendChild(b); });
 })();
 $("keysBtn").onclick = ()=>{ const k=$("keys"); k.style.display = k.style.display==="flex"?"none":"flex"; };
-window.addEventListener("resize", ()=>{ renderNotes(); update(); });
+window.addEventListener("resize", ()=>{ renderNotes(); update(); drawBall(performance.now()); });
 // debug hook: pianoStar.play("C") simulates hearing a note
-window.pianoStar = { play:(name)=>{ const i=NAMES.indexOf(String(name).toUpperCase()); if (i>=0){ if(!running&&!tapMode){tapMode=true;newGame();} handleNote(i);} }, state:()=>({idx,score,right,wrong,len:seq.length,song:sel.value}) };
+window.pianoStar = { play:(name)=>{ const i=NAMES.indexOf(String(name).toUpperCase()); if (i>=0){ if(!running&&!tapMode){tapMode=true;newGame(true);} handleNote(i);} },
+  state:()=>({idx,score,right,wrong,len:seq.length,song:sel.value,bpm:bpm(),phase:T.phase,timing:T.log.slice(-8)}), setBpm };
 $("addBtn").onclick = ()=>{ const a=$("addSong"); a.style.display = a.style.display==="block"?"none":"block"; };
 $("saveSong").onclick = ()=>{
   const name=$("newName").value.trim(), notes=$("newNotes").value.trim();
@@ -418,7 +587,7 @@ $("saveSong").onclick = ()=>{
   sel.onchange();
 };
 // preview the default song before starting
-drawClef(); loadSel(); renderNotes(); update(); $("target").textContent="♪";
+drawClef(); loadSel(); renderNotes(); update(); updateTempoUI(); $("target").textContent="♪"; tempoLoop();
 </script>
 </body>
 </html>
