@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Piano Star</title>
+<style>
+  :root { --bg:#1e2a5a; --card:#2c3b7a; --good:#3ddc84; --bad:#ff5c6c; --gold:#ffd23f; }
+  * { box-sizing:border-box; -webkit-user-select:none; user-select:none; }
+  body { margin:0; font-family:-apple-system, "Avenir Next", "Helvetica Neue", sans-serif;
+         background:radial-gradient(circle at 50% 0%, #3a4fa8, var(--bg)); color:#fff; min-height:100vh;
+         display:flex; flex-direction:column; align-items:center; }
+  h1 { margin:18px 0 4px; font-size:44px; letter-spacing:1px; }
+  h1 span { color:var(--gold); }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:center; margin:8px; }
+  select, button { font-size:24px; border-radius:16px; border:none; padding:12px 22px; font-weight:700; }
+  select { background:#fff; color:#1e2a5a; }
+  button { background:var(--gold); color:#1e2a5a; box-shadow:0 5px 0 #b8901a; }
+  button:active { transform:translateY(3px); box-shadow:0 2px 0 #b8901a; }
+  button.secondary { background:#fff; box-shadow:0 5px 0 #aab; }
+  #stage { width:min(96vw,1000px); background:var(--card); border-radius:28px; padding:20px; margin-top:10px;
+           box-shadow:0 10px 30px rgba(0,0,0,.35); text-align:center; }
+  #prompt { font-size:26px; opacity:.9; }
+  #target { font-size:160px; font-weight:900; line-height:1.05; color:var(--gold); text-shadow:0 6px 0 rgba(0,0,0,.25);
+            transition:transform .15s; }
+  #target.pop { transform:scale(1.2); }
+  #heard { font-size:28px; min-height:36px; }
+  #notes { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:14px 0; }
+  .n { width:54px; height:54px; border-radius:50%; background:#44549a; display:flex; align-items:center; justify-content:center;
+       font-size:22px; font-weight:800; border:3px solid transparent; }
+  .n.done { background:var(--good); color:#103; }
+  .n.now { border-color:var(--gold); background:#5a6cc0; transform:scale(1.15); }
+  .bar { width:100%; height:28px; background:#16204a; border-radius:14px; overflow:hidden; }
+  .bar > div { height:100%; width:0%; background:linear-gradient(90deg,var(--good),var(--gold)); transition:width .3s; }
+  #stats { display:flex; justify-content:space-around; font-size:30px; font-weight:800; margin-top:14px; }
+  #stars { font-size:46px; letter-spacing:4px; margin-top:6px; min-height:56px; }
+  #flash { position:fixed; inset:0; pointer-events:none; opacity:0; transition:opacity .25s; }
+  #meter { width:100%; height:10px; background:#16204a; border-radius:5px; margin-top:10px; overflow:hidden; }
+  #meter > div { height:100%; width:0; background:#8fd3ff; }
+  #big { position:fixed; inset:0; display:none; align-items:center; justify-content:center; flex-direction:column;
+         background:rgba(20,25,60,.92); font-size:60px; font-weight:900; text-align:center; z-index:5; }
+  #big .s { font-size:90px; color:var(--gold); }
+  small { opacity:.7; }
+  #addSong { display:none; width:min(96vw,1000px); background:var(--card); border-radius:20px; padding:16px; margin-top:12px; }
+  #addSong textarea { width:100%; height:70px; font-size:20px; border-radius:10px; padding:8px; }
+</style>
+</head>
+<body>
+<h1>🎹 Piano <span>Star</span></h1>
+<div class="row">
+  <select id="song"></select>
+  <button id="start">▶ Start</button>
+  <button id="restart" class="secondary">↺ Restart</button>
+  <button id="addBtn" class="secondary">＋ Song</button>
+</div>
+
+<div id="stage">
+  <div id="prompt">Tap Start and allow the microphone 🎤</div>
+  <div id="target">♪</div>
+  <div id="heard">&nbsp;</div>
+  <div id="notes"></div>
+  <div class="bar"><div id="prog"></div></div>
+  <div id="stats"><div>⭐ <span id="score">0</span></div><div>✅ <span id="right">0</span></div><div>❌ <span id="wrong">0</span></div></div>
+  <div id="stars"></div>
+  <div id="meter"><div id="lvl"></div></div>
+  <small>The blue bar shows how loud the microphone hears you.</small>
+</div>
+
+<div id="addSong">
+  <b>Add your own song</b> (letters with spaces, use # for sharps, like: C C G G A A G)<br>
+  <input id="newName" placeholder="Song name" style="font-size:20px;padding:8px;border-radius:10px;border:none;margin:8px 0;width:60%">
+  <textarea id="newNotes" placeholder="E D C D E E E"></textarea>
+  <div class="row"><button id="saveSong">Save song</button></div>
+</div>
+
+<div id="flash"></div>
+<div id="big"><div id="bigText">Great job!</div><div class="s" id="bigStars"></div><button id="again" style="margin-top:20px">Play again</button></div>
+
+<script>
+// ---------- Songs (edit or add here; note letters only, octave doesn't matter) ----------
+const BUILT_IN = {
+  "Twinkle Twinkle Little Star": "C C G G A A G F F E E D D C G G F F E E D G G F F E E D C C G G A A G F F E E D D C",
+  "Ode to Joy": "E E F G G F E D C C D E E D D E E F G G F E D C C D E D C C",
+  "Mary Had a Little Lamb": "E D C D E E E D D D E G G E D C D E E E E D D E D C",
+  "Hot Cross Buns": "E D C E D C C C C C D D D D E D C",
+  "Jingle Bells (chorus)": "E E E E E E E G C D E F F F F F E E E E D D E D G"
+};
+const NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const FLAT = {"DB":"C#","EB":"D#","GB":"F#","AB":"G#","BB":"A#"};
+
+function loadSongs(){
+  let custom = {};
+  try { custom = JSON.parse(localStorage.getItem("pianoStarSongs")||"{}"); } catch(e){}
+  return Object.assign({}, BUILT_IN, custom);
+}
+let SONGS = loadSongs();
+const sel = document.getElementById("song");
+function fillSongs(pick){
+  sel.innerHTML = "";
+  Object.keys(SONGS).forEach(k=>{ const o=document.createElement("option"); o.textContent=k; sel.appendChild(o); });
+  if (pick) sel.value = pick;
+}
+fillSongs();
+
+function parseSong(str){
+  return str.trim().toUpperCase().split(/[\s,]+/).filter(Boolean).map(t=>{
+    t = t.replace(/[0-9]/g,"");
+    if (FLAT[t]) t = FLAT[t];
+    return NAMES.indexOf(t);
+  }).filter(i=>i>=0);
+}
+
+// ---------- Game state ----------
+let seq=[], idx=0, score=0, right=0, wrong=0, lastHitTime=0, gaps=[];
+const $ = id=>document.getElementById(id);
+
+function newGame(){
+  seq = parseSong(SONGS[sel.value]);
+  idx=0; score=0; right=0; wrong=0; lastHitTime=0; gaps=[];
+  armed = true; wrongRun = 0;
+  $("big").style.display="none";
+  renderNotes(); update();
+}
+function renderNotes(){
+  const box=$("notes"); box.innerHTML="";
+  seq.forEach((n,i)=>{ const d=document.createElement("div"); d.className="n"; d.textContent=NAMES[n]; box.appendChild(d); });
+}
+function update(){
+  const dots=$("notes").children;
+  for (let i=0;i<dots.length;i++){ dots[i].className = "n" + (i<idx?" done":"") + (i===idx?" now":""); }
+  if (dots[idx]) dots[idx].scrollIntoView({block:"nearest",inline:"center"});
+  $("target").textContent = idx<seq.length ? NAMES[seq[idx]] : "🎉";
+  $("prog").style.width = (seq.length? idx/seq.length*100 : 0)+"%";
+  $("score").textContent=score; $("right").textContent=right; $("wrong").textContent=wrong;
+  $("stars").textContent = "⭐".repeat(Math.floor(right/5));
+}
+function flash(color){
+  const f=$("flash"); f.style.background=color; f.style.opacity=.35; setTimeout(()=>f.style.opacity=0,180);
+}
+function hit(){
+  const now=performance.now();
+  let pts=10, msg="Yes! 🎉";
+  if (lastHitTime){
+    const gap=(now-lastHitTime)/1000; gaps.push(gap);
+    // steady-rhythm bonus: gap close to his own average pace
+    const avg=gaps.reduce((a,b)=>a+b,0)/gaps.length;
+    if (gaps.length>2 && Math.abs(gap-avg) < avg*0.35){ pts+=5; msg="Great rhythm! +5 🥁"; }
+  }
+  lastHitTime=now;
+  score+=pts; right++; idx++;
+  $("heard").textContent = msg;
+  const t=$("target"); t.classList.add("pop"); setTimeout(()=>t.classList.remove("pop"),150);
+  flash("#3ddc84");
+  update();
+  if (idx>=seq.length) finish();
+}
+function miss(n){
+  wrong++; score=Math.max(0,score-2);
+  $("heard").textContent = "I heard " + NAMES[n] + " — try " + NAMES[seq[idx]] + "!";
+  flash("#ff5c6c"); update();
+}
+function finish(){
+  const acc = right/Math.max(1,right+wrong);
+  const s = acc>0.9?3:acc>0.7?2:1;
+  $("bigText").innerHTML = (s===3?"Amazing!":s===2?"Great job!":"Nice work!") + "<br><span style='font-size:36px'>Score " + score + "</span>";
+  $("bigStars").textContent = "⭐".repeat(s) + "☆".repeat(3-s);
+  $("big").style.display="flex";
+}
+
+// ---------- Microphone + pitch detection ----------
+let ctx, analyser, buf, running=false;
+let armed=true, stableNote=-1, stableCount=0, peakRms=0, wrongRun=0;
+const RMS_MIN = 0.012;     // ignore quiet sounds
+const STABLE_FRAMES = 3;   // frames a note must hold before it counts
+
+async function startMic(){
+  if (running) { newGame(); return; }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    ctx = new (window.AudioContext||window.webkitAudioContext)();
+    await ctx.resume();
+    const src = ctx.createMediaStreamSource(stream);
+    analyser = ctx.createAnalyser(); analyser.fftSize = 4096;
+    src.connect(analyser);
+    buf = new Float32Array(analyser.fftSize);
+    running=true;
+    $("prompt").textContent = "Play this note:";
+    $("start").textContent = "▶ New game";
+    newGame(); loop();
+  }catch(e){
+    $("prompt").textContent = "I couldn't use the microphone. Allow it in Safari (aA menu → Website Settings → Microphone), and open this page from an https:// link.";
+  }
+}
+
+// Autocorrelation pitch detector (works well for piano fundamentals ~60–2000 Hz)
+function detectPitch(b, sr){
+  let n=b.length, rms=0;
+  for (let i=0;i<n;i++) rms+=b[i]*b[i];
+  rms=Math.sqrt(rms/n);
+  if (rms<RMS_MIN) return {f:-1,rms};
+  // trim to the part above a threshold
+  let r1=0, r2=n-1, th=0.2;
+  for (let i=0;i<n/2;i++) if (Math.abs(b[i])<th){ r1=i; break; }
+  for (let i=1;i<n/2;i++) if (Math.abs(b[n-i])<th){ r2=n-i; break; }
+  const x=b.slice(r1,r2), m=x.length;
+  const c=new Float32Array(m);
+  for (let lag=0;lag<m;lag++){ let s=0; for (let i=0;i<m-lag;i++) s+=x[i]*x[i+lag]; c[lag]=s; }
+  let d=0; while (d<m-1 && c[d]>c[d+1]) d++;
+  let maxv=-1, maxp=-1;
+  for (let i=d;i<m;i++) if (c[i]>maxv){ maxv=c[i]; maxp=i; }
+  if (maxp<=0) return {f:-1,rms};
+  // parabolic interpolation
+  const y1=c[maxp-1]||0, y2=c[maxp], y3=c[maxp+1]||0;
+  const a=(y1+y3-2*y2)/2, bb=(y3-y1)/2;
+  const T = a ? maxp - bb/(2*a) : maxp;
+  const f = sr/T;
+  if (f<60 || f>2100) return {f:-1,rms};
+  return {f,rms};
+}
+function noteFromFreq(f){ const midi=Math.round(12*Math.log2(f/440)+69); return ((midi%12)+12)%12; }
+
+function loop(){
+  analyser.getFloatTimeDomainData(buf);
+  const {f,rms} = detectPitch(buf, ctx.sampleRate);
+  $("lvl").style.width = Math.min(100, rms*600)+"%";
+
+  // re-arm after the sound fades (lets repeated notes like C C count twice)
+  if (rms > peakRms) peakRms = rms;
+  if (!armed && (rms < peakRms*0.45 || rms < RMS_MIN)) { armed=true; peakRms=rms; }
+
+  if (f>0){
+    const n=noteFromFreq(f);
+    if (n===stableNote) stableCount++; else { stableNote=n; stableCount=1; }
+    if (armed && stableCount>=STABLE_FRAMES && idx<seq.length){
+      if (n===seq[idx]){ hit(); armed=false; peakRms=rms; wrongRun=0; }
+      else if (stableCount>=STABLE_FRAMES+3){ miss(n); armed=false; peakRms=rms; }
+    }
+  } else { stableNote=-1; stableCount=0; }
+  requestAnimationFrame(loop);
+}
+
+// ---------- Buttons ----------
+$("start").onclick = startMic;
+$("restart").onclick = ()=>{ if (running) newGame(); };
+$("again").onclick = newGame;
+sel.onchange = ()=>{ if (running) newGame(); else { seq=parseSong(SONGS[sel.value]); idx=0; renderNotes(); update(); } };
+$("addBtn").onclick = ()=>{ const a=$("addSong"); a.style.display = a.style.display==="block"?"none":"block"; };
+$("saveSong").onclick = ()=>{
+  const name=$("newName").value.trim(), notes=$("newNotes").value.trim();
+  if (!name || parseSong(notes).length<2) { alert("Add a name and at least 2 notes."); return; }
+  let custom={}; try{ custom=JSON.parse(localStorage.getItem("pianoStarSongs")||"{}"); }catch(e){}
+  custom[name]=notes; localStorage.setItem("pianoStarSongs", JSON.stringify(custom));
+  SONGS=loadSongs(); fillSongs(name); $("addSong").style.display="none";
+  if (running) newGame(); else sel.onchange();
+};
+// preview the default song before starting
+seq=parseSong(SONGS[sel.value]); renderNotes(); update(); $("target").textContent="♪";
+</script>
+</body>
+</html>
